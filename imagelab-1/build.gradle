@@ -1,0 +1,175 @@
+/*
+ * Build configuraiton for the ImageLab project.
+ * Version: 1.8.2
+ */
+
+plugins {
+    // Apply the java plugin to add support for Java
+    id 'java'
+
+    // Apply the application plugin to add support for building a CLI application
+    id 'application'
+
+    // Apply the jacoco plugin to add support for junit code coverage analysis
+    id 'jacoco'
+
+    // Apply the checkstyle plugin to add support for adherence to coding conventions
+    id 'checkstyle'
+}
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    implementation 'junit:junit:4.12'
+
+    // These dependencies are used by the application.
+    // implementation 'com.google.guava:guava:28.0-jre'
+
+    // Use JUnit test framework
+    testImplementation 'junit:junit:4.12'
+
+    // JUnit compile dependencies
+    testCompile 'junit:junit:4.12'
+    compile 'junit:junit:4.12'
+}
+
+// Add source code directories
+sourceSets {
+    main {
+        java {
+            srcDirs('imagelab','filters','sound',"${project.projectDir}")
+        }
+    }
+    
+    test {
+        java {
+            srcDirs('imagelab','filters','sound',"${project.projectDir}")
+        }
+    }
+}
+
+application {
+    // Define the main class for the application
+    mainClassName = 'Run'
+}
+
+jar {
+    manifest {
+        attributes "Main-Class": "Run"
+    }
+
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+test {
+    useJUnit()
+    reports.html.destination = file("$buildDir/reports/JUnit")
+}
+
+// Define jacoco version to be used
+jacoco {
+    toolVersion = "0.8.4"
+    reportsDir = file("$buildDir/reports/jacoco")
+    applyTo run
+}
+
+// Define file type for structured reports
+jacocoTestReport {
+    reports{
+        xml.enabled false
+        csv.enabled false
+        html.destination file("$buildDir/reports/jacoco")
+    }
+}
+
+// Define coverage pass/fail rules for unit tests
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = 0.85
+            }
+        }
+    }
+} 
+
+task checkstyle(type: Checkstyle, dependsOn: ['checkstyleMain', 'checkstyleTest']) {
+    group 'Verification'
+    description 'Generates reports from Checkstyle.'
+}
+
+tasks.withType(Checkstyle) {
+    ignoreFailures = true
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+/* moveClassFilesToRootDirs will move all compiled 
+** .class files to their corresponding root directory.
+** Moving the files to their corresponding root
+** directory is necessary for mimicking BlueJ's 
+** convention as the project is designed to search 
+** the root directories for .class files. 
+*/
+task moveClassFilesToRootDirs {
+    task copyFilterClassFiles(type: Copy) {
+        from ('build/classes/java/main/filters')
+        into 'filters/'
+    }
+    task copyImagelabClassFiles(type: Copy) {
+        from ('build/classes/java/main/imagelab')
+        into 'imagelab/'
+    }
+    task copySoundClassFiles(type: Copy) {
+        from ('build/classes/java/main/sound')
+        into 'sound/'
+    }
+    task copyRunClassFile(type: Copy) {
+        from ('build/classes/java/main')
+        into "${project.projectDir}"
+    }
+    task copyImageLabJarFile(type: Copy) {
+        from ('build/libs')
+        into "${project.projectDir}"
+    }
+    task removeBuildClassesDir(type: Delete) {
+        delete 'build/classes'
+    }
+    task removeBuildLibsDir(type: Delete) {
+        delete 'build/libs'
+    }
+}
+// List the tasks to be executed within moveClassFilesToRootDirs task
+moveClassFilesToRootDirs.dependsOn copyFilterClassFiles, copyImagelabClassFiles, 
+copySoundClassFiles, copyRunClassFile, copyImageLabJarFile
+moveClassFilesToRootDirs.finalizedBy removeBuildClassesDir, removeBuildLibsDir
+
+run.dependsOn copyFilterClassFiles
+build.finalizedBy moveClassFilesToRootDirs
+
+
+// remove all *.class files from filters, imagelab, sound
+task removeClassFilesFromRootDirs {
+    delete fileTree("filters").matching {
+        include "*.class"
+    }
+    delete fileTree("imagelab").matching {
+        include "*.class"
+    }
+    delete fileTree("sound").matching {
+        include "*.class"
+    }
+    delete fileTree("${project.projectDir}").matching {
+        include "Run.class"
+    }
+}
+clean.finalizedBy removeClassFilesFromRootDirs
